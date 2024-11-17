@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hybrid Cryptography and Steganography</title>
+    <!-- Bootstrap CDN -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            padding:20px;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0px 4px 8px rgba(0,0,0,0.1);
+            padding: 30px;
+            margin-top: 30px;
+        }
+        textarea, input {
+            margin-bottom: 20px;
+            resize: none;
+        }
+        #stegoImage {
+            max-width: 100%;
+            height: auto;
+            display: none;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+        }
+        #downloadButton {
+            display: none;
+            margin-top: 20px;
+        }
+        #explanation {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f1f1f1;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+        }
+        button {
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #007BFF;
+            color: white;
+        }
+        h1 {
+            color: #007BFF;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center">Hybrid Cryptography & Steganography</h1>
+
+        <!-- Step 1: Encrypt Message -->
+        <h2>Step 1: Encrypt Message</h2>
+        <textarea id="message" class="form-control" rows="3" placeholder="Enter your message"></textarea>
+        <button class="btn btn-primary" onclick="encryptMessage()">Encrypt Message</button>
+        <p>Encrypted Message:</p>
+        <textarea id="encryptedMessage" class="form-control" rows="2" readonly></textarea>
+
+        <!-- Step 2: Upload Image and Hide Message -->
+        <h2>Step 2: Upload Image and Hide Message</h2>
+        <input type="file" id="imageUpload" class="form-control-file" accept="image/*">
+        <button class="btn btn-success mt-2" onclick="hideMessage()">Hide Message in Image</button>
+        <canvas id="canvas" style="display:none;"></canvas>
+        <img id="stegoImage" class="mt-3 img-thumbnail" src="" alt="Steganography Image">
+        <button id="downloadButton" class="btn btn-warning mt-3" style="display:none;">Download Stego Image</button>
+
+        <!-- Step 3: Reveal Hidden Message -->
+        <h2 class="mt-4">Step 3: Upload Stego Image to Decrypt Message</h2>
+        <input type="file" id="stegoUpload" class="form-control-file" accept="image/*">
+        <button class="btn btn-danger mt-2" onclick="revealMessage()">Reveal Hidden Message</button>
+        <p>Decrypted Message:</p>
+        <textarea id="decryptedMessage" class="form-control" rows="2" readonly></textarea>
+
+        <!-- Explanation Section -->
+        <div id="explanation" style="display:none;">
+            <h3>Explanation of Steganography:</h3>
+            <p>The encrypted message is hidden in a specific part of the image, and we have highlighted the region where the message is being hidden. The actual hidden data is embedded within the image pixels.</p>
+            <p>Notice the highlighted box showing where the encrypted message is hidden inside the image.</p>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/crypto-js.min.js"></script>
+    <script>
+        // AES Encryption/Decryption using CryptoJS
+        function encryptMessage() {
+            const message = document.getElementById('message').value;
+            const secretKey = "mySecretKey123";  // This should be securely generated and stored
+
+            if (message === "") {
+                alert("Please enter a message to encrypt");
+                return;
+            }
+
+            // Encrypt the message using AES
+            const encryptedMessage = CryptoJS.AES.encrypt(message, secretKey).toString();
+            document.getElementById('encryptedMessage').value = encryptedMessage;
+        }
+
+        function decryptMessage(encryptedMessage) {
+            const secretKey = "mySecretKey123";  // Same secret key used for encryption
+
+            // Decrypt the message
+            const decryptedBytes = CryptoJS.AES.decrypt(encryptedMessage, secretKey);
+            const decryptedMessage = decryptedBytes.toString(CryptoJS.enc.Utf8);
+            return decryptedMessage;
+        }
+
+        // Steganography - Hiding the encrypted message in an image and displaying it visually
+        function hideMessage() {
+            const encryptedMessage = document.getElementById('encryptedMessage').value;
+            const file = document.getElementById('imageUpload').files[0];
+
+            if (!file || !encryptedMessage) {
+                alert('Please upload an image and encrypt a message first!');
+                return;
+            }
+
+            const reader = new FileReader();
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+
+            reader.onload = function (event) {
+                const img = new Image();
+                img.onload = function () {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+
+                    // Convert the encrypted message to binary
+                    const binaryMessage = stringToBinary(encryptedMessage);
+                    let pixelData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    let data = pixelData.data;
+
+                    // Hide message in the least significant bit of the pixel data
+                    for (let i = 0; i < binaryMessage.length; i++) {
+                        if (i < data.length) {
+                            data[i * 4] = (data[i * 4] & 0xFE) | (binaryMessage[i] === '1' ? 1 : 0); // Modify the red channel
+                        }
+                    }
+
+                    // Draw a box to indicate where the message is hidden
+                    ctx.strokeStyle = 'red';
+                    ctx.lineWidth = 5;
+                    ctx.strokeRect(10, 10, 150, 100);  // Highlight the area (position, width, height)
+
+                    // Visually overlay the encrypted message on the image for demo purposes
+                    ctx.font = '20px Arial';
+                    ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';  // Red text with some transparency
+                    ctx.fillText(`Encrypted: ${encryptedMessage}`, 20, 50);
+
+                    ctx.putImageData(pixelData, 0, 0);
+                    const stegoDataUrl = canvas.toDataURL('image/png');
+                    const stegoImage = document.getElementById('stegoImage');
+
+                    // Display the stego image with animation and border
+                    stegoImage.src = stegoDataUrl;
+                    stegoImage.style.display = 'block';
+                    stegoImage.style.border = '5px solid #4CAF50';  // Green border to indicate success
+                    stegoImage.style.opacity = 1;  // Fade-in effect
+
+                    // Display explanation
+                    document.getElementById('explanation').style.display = 'block';
+
+                    // Enable download button
+                    document.getElementById('downloadButton').style.display = 'inline-block';
+                    document.getElementById('downloadButton').onclick = function () {
+                        downloadImage(stegoDataUrl, 'stegoImage.png');
+                    };
+                };
+                img.src = event.target.result;
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        function stringToBinary(str) {
+            return str.split('').map(char => char.charCodeAt(0).toString(2).padStart(8, '0')).join('');
+        }
+
+        function downloadImage(dataUrl, filename) {
+            const a = document.createElement('a');
+            a.href = dataUrl;
+            a.download = filename;
+            a.click();
+        }
+
+        // Steganography - Extract the message from the image
+        function revealMessage() {
+            const file = document.getElementById('stegoUpload').files[0];
+
+            if (!file) {
+                alert('Please upload a stego image!');
+                return;
+            }
+
+            const reader = new FileReader();
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+
+            reader.onload = function (event) {
+                const img = new Image();
+                img.onload = function () {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+
+                    // Extract the message from the least significant bit of the pixel data
+                    let binaryMessage = '';
+                    for (let i = 0; i < data.length; i += 4) {
+                        binaryMessage += (data[i] & 1).toString(); // Read the red channel
+                    }
+
+                    // Convert binary message back to string
+                    const decryptedMessage = binaryToString(binaryMessage);
+                    document.getElementById('decryptedMessage').value = decryptMessage(decryptedMessage);
+                };
+                img.src = event.target.result;
+            };
+
+            reader.readAsDataURL(file);
+        }
+
+        function binaryToString(binary) {
+            const message = [];
+            for (let i = 0; i < binary.length; i += 8) {
+                const byte = binary.slice(i, i + 8);
+                message.push(String.fromCharCode(parseInt(byte, 2)));
+            }
+            return message.join('');
+        }
+    </script>
+</body>
+</html>
